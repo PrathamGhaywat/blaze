@@ -1,1 +1,25 @@
-test
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Blaze storage
+.blaze/
+
+# Build output
+/bin/
+/dist/

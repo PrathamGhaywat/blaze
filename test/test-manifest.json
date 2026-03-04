@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "test-package",
+  "version": "1.0.0",
+  "description": "Test package for blaze",
+  "homepage": "https://example.com",
+  "author": {
+    "name": "Test Author",
+    "email": "test@example.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/test/test-package"
+  },
+  "license": "MIT",
+  "targets": {
+    "windows-amd64": {
+      "archive_type": "zip",
+      "url": "https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_windows_amd64.zip",
+      "sha256": "d4d6e27cf87fa21e7e8f5c5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e",
+      "bin": ["bin/gh.exe"]
+    },
+    "linux-amd64": {
+      "archive_type": "tar.gz",
+      "url": "https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_linux_amd64.tar.gz",
+      "sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+      "bin": ["bin/gh"]
+    },
+    "darwin-amd64": {
+      "archive_type": "zip",
+      "url": "https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_macOS_amd64.zip",
+      "sha256": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+      "bin": ["gh"]
+    }
+  }
+}
