@@ -61,6 +61,23 @@ func handleAdd(manifestURL string) error {
 		binDir := filepath.Dir(binPath)
 
 		fmt.Printf("🔗 Adding to PATH: %s\n", binDir)
+
+		// Check if binary exists
+		if _, err := os.Stat(binPath); os.IsNotExist(err) {
+			fmt.Printf("   ⚠️  Binary not found at: %s\n", binPath)
+			fmt.Printf("   Available files in extract path:\n")
+
+			// List what's actually there
+			filepath.Walk(extractPath, func(path string, info os.FileInfo, err error) error {
+				if !info.IsDir() && strings.Contains(info.Name(), "gh") {
+					fmt.Printf("      - %s\n", path)
+				}
+				return nil
+			})
+
+			return fmt.Errorf("binary not found at expected path: %s", binPath)
+		}
+
 		if err := em.AddToPath(binDir); err != nil {
 			return fmt.Errorf("failed to add to PATH: %w", err)
 		}
