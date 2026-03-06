@@ -33,7 +33,32 @@ func handleAdd(manifestURL string) error {
 	}
 
 	pkgPath := sm.GetPackagePath(manifest.Name, manifest.Version)
+	if _, err := os.Stat(pkgPath); err == nil {
+		return fmt.Errorf("package %s@%s is already installed", manifest.Name, manifest.Version)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to check existing installation: %w", err)
+	}
+
 	archivePath := filepath.Join(pkgPath, "archive")
+	extractPath := filepath.Join(pkgPath, "content")
+	addedPathDirs := make([]string, 0)
+	installCommitted := false
+
+	defer func() {
+		if installCommitted {
+			return
+		}
+
+		for index := len(addedPathDirs) - 1; index >= 0; index-- {
+			if err := NewEnvManager().RemoveFromPath(addedPathDirs[index]); err != nil {
+				fmt.Printf("⚠️  Failed to roll back PATH entry %s: %v\n", addedPathDirs[index], err)
+			}
+		}
+
+		if err := os.RemoveAll(pkgPath); err != nil && !os.IsNotExist(err) {
+			fmt.Printf("⚠️  Failed to clean up partial install at %s: %v\n", pkgPath, err)
+		}
+	}()
 
 	fmt.Printf("⬇️  Downloading and verifying package...\n")
 
@@ -45,7 +70,6 @@ func handleAdd(manifestURL string) error {
 	fmt.Printf("✓ Download verified\n")
 
 	// Extract archive
-	extractPath := filepath.Join(pkgPath, "content")
 	fmt.Printf("📂 Extracting archive...\n")
 
 	if err := ExtractArchive(archivePath, extractPath, target.ArchiveType); err != nil {
@@ -56,6 +80,7 @@ func handleAdd(manifestURL string) error {
 
 	// Add binaries to PATH
 	em := NewEnvManager()
+	seenBinDirs := make(map[string]struct{})
 	for _, bin := range target.Bin {
 		binPath := filepath.Join(extractPath, bin)
 		binDir := filepath.Dir(binPath)
@@ -69,18 +94,30 @@ func handleAdd(manifestURL string) error {
 
 			// List what's actually there
 			filepath.Walk(extractPath, func(path string, info os.FileInfo, err error) error {
-				if !info.IsDir() && strings.Contains(info.Name(), "gh") {
+				if err != nil || info == nil {
+					return nil
+				}
+				if !info.IsDir() && strings.Contains(strings.ToLower(info.Name()), strings.ToLower(filepath.Base(binPath))) {
 					fmt.Printf("      - %s\n", path)
 				}
 				return nil
 			})
 
 			return fmt.Errorf("binary not found at expected path: %s", binPath)
+		} else if err != nil {
+			return fmt.Errorf("failed to validate binary path %s: %w", binPath, err)
+		}
+
+		if _, exists := seenBinDirs[binDir]; exists {
+			continue
 		}
 
 		if err := em.AddToPath(binDir); err != nil {
 			return fmt.Errorf("failed to add to PATH: %w", err)
 		}
+
+		seenBinDirs[binDir] = struct{}{}
+		addedPathDirs = append(addedPathDirs, binDir)
 	}
 
 	// Update registry
@@ -89,10 +126,20 @@ func handleAdd(manifestURL string) error {
 		return fmt.Errorf("failed to load registry: %w", err)
 	}
 
+	for _, version := range registry[manifest.Name] {
+		if version == manifest.Version {
+			installCommitted = true
+			fmt.Printf("✅ Package already registered: %s@%s\n", manifest.Name, manifest.Version)
+			return nil
+		}
+	}
+
 	registry[manifest.Name] = append(registry[manifest.Name], manifest.Version)
 	if err := sm.SaveRegistry(registry); err != nil {
 		return fmt.Errorf("failed to save registry: %w", err)
 	}
+
+	installCommitted = true
 
 	fmt.Printf("✅ Package installed: %s@%s\n", manifest.Name, manifest.Version)
 	return nil

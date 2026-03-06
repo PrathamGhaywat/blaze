@@ -17,6 +17,12 @@ func VerifyAndDownload(url, expectedSHA256, destPath string) error {
 		return fmt.Errorf("only http and https URLs are supported, got: %s", url)
 	}
 
+	tempPath := destPath + ".tmp"
+	downloadCommitted := false
+	if err := os.Remove(tempPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to clear temporary download file: %w", err)
+	}
+
 	// Download the file
 	resp, err := http.Get(url)
 	if err != nil {
@@ -33,11 +39,16 @@ func VerifyAndDownload(url, expectedSHA256, destPath string) error {
 	tee := io.TeeReader(resp.Body, hash)
 
 	// Write to destination
-	file, err := createFile(destPath)
+	file, err := createFile(tempPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		file.Close()
+		if !downloadCommitted {
+			os.Remove(tempPath)
+		}
+	}()
 
 	if _, err := io.Copy(file, tee); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
@@ -48,6 +59,20 @@ func VerifyAndDownload(url, expectedSHA256, destPath string) error {
 	if actualSHA256 != strings.ToLower(expectedSHA256) {
 		return fmt.Errorf("SHA256 mismatch: expected %s, got %s", expectedSHA256, actualSHA256)
 	}
+
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to finalize downloaded file: %w", err)
+	}
+
+	if err := os.Remove(destPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to replace existing archive: %w", err)
+	}
+
+	if err := os.Rename(tempPath, destPath); err != nil {
+		return fmt.Errorf("failed to move verified archive into place: %w", err)
+	}
+
+	downloadCommitted = true
 
 	return nil
 }
