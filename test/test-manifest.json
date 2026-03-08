@@ -1,16 +1,16 @@
 {
   "schema": 1,
-  "name": "gh_2.87.3_windows_amd64",
-  "version": "2.83.7.3",
-  "description": "Github CLI",
-  "homepage": "https://example.com",
+  "name": "gh",
+  "version": "2.87.3",
+  "description": "GitHub CLI",
+  "homepage": "https://cli.github.com",
   "author": {
-    "name": "Test",
-    "email": "test@example.com"
+    "name": "GitHub",
+    "email": "support@github.com"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/test/test"
+    "url": "https://github.com/cli/cli"
   },
   "license": "MIT",
   "targets": {
@@ -18,7 +18,17 @@
       "archive_type": "zip",
       "url": "https://github.com/cli/cli/releases/download/v2.87.3/gh_2.87.3_windows_amd64.zip",
       "sha256": "c590bcb488f80a85c8febd5cde27edd68fdd481bd004aaf9adc50dcf1b21c09c",
-      "bin": ["bin/gh.exe"]
+      "bin": [
+        "bin/gh.exe"
+      ]
+    },
+    "linux-amd64": {
+      "archive_type": "tar.gz",
+      "url": "https://github.com/cli/cli/releases/download/v2.87.3/gh_2.87.3_linux_amd64.tar.gz",
+      "sha256": "sha256:c6e5537631fca45f277ef405ce8751d139b491e9402cc20891a003525a8773b2",
+      "bin": [
+        "bin/gh"
+      ]
     }
   }
 }
