@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,11 @@ import (
 	"sort"
 	"strings"
 )
+
+// PackageMetadata stores information about an installed package version
+type PackageMetadata struct {
+	BinDirs []string `json:"bin_dirs"`
+}
 
 // handleAdd fetches, downloads, extracts, and registers a package
 func handleAdd(manifestURL string) error {
@@ -150,6 +156,23 @@ func handleAdd(manifestURL string) error {
 	registry[manifest.Name] = append(registry[manifest.Name], manifest.Version)
 	if err := sm.SaveRegistry(registry); err != nil {
 		return fmt.Errorf("failed to save registry: %w", err)
+	}
+
+	// Save metadata (bin directories for this version)
+	metadata := PackageMetadata{
+		BinDirs: make([]string, 0, len(seenBinDirs)),
+	}
+	for binDir := range seenBinDirs {
+		metadata.BinDirs = append(metadata.BinDirs, binDir)
+	}
+
+	metadataPath := filepath.Join(pkgPath, ".metadata.json")
+	metadataJSON, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+	if err := os.WriteFile(metadataPath, metadataJSON, 0644); err != nil {
+		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
 	installCommitted = true
@@ -359,7 +382,55 @@ func handleUse(pkgSpec string) error {
 		return fmt.Errorf("version %s not found for %s. Available: %s", version, pkgName, versionsStr)
 	}
 
+	em := NewEnvManager()
+
+	// Remove all versions of this package from PATH
+	for _, v := range versions {
+		pkgPath := sm.GetPackagePath(pkgName, v)
+		metadataPath := filepath.Join(pkgPath, ".metadata.json")
+
+		metadataData, err := os.ReadFile(metadataPath)
+		if err != nil {
+			fmt.Printf("⚠️  Could not read metadata for %s@%s, skipping PATH removal\n", pkgName, v)
+			continue
+		}
+
+		var metadata PackageMetadata
+		if err := json.Unmarshal(metadataData, &metadata); err != nil {
+			fmt.Printf("⚠️  Could not parse metadata for %s@%s, skipping PATH removal\n", pkgName, v)
+			continue
+		}
+
+		for _, binDir := range metadata.BinDirs {
+			if err := em.RemoveFromPath(binDir); err != nil {
+				fmt.Printf("⚠️  Failed to remove %s from PATH: %v\n", binDir, err)
+			}
+		}
+	}
+
+	// Add target version to PATH
+	targetPkgPath := sm.GetPackagePath(pkgName, version)
+	metadataPath := filepath.Join(targetPkgPath, ".metadata.json")
+
+	metadataData, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return fmt.Errorf("failed to read metadata for %s@%s: %w", pkgName, version, err)
+	}
+
+	var targetMetadata PackageMetadata
+	if err := json.Unmarshal(metadataData, &targetMetadata); err != nil {
+		return fmt.Errorf("failed to parse metadata for %s@%s: %w", pkgName, version, err)
+	}
+
+	for _, binDir := range targetMetadata.BinDirs {
+		fmt.Printf("🔗 Adding to PATH: %s\n", binDir)
+		if err := em.AddToPath(binDir); err != nil {
+			return fmt.Errorf("failed to add %s to PATH: %w", binDir, err)
+		}
+	}
+
 	fmt.Printf("✅ Switched to %s@%s\n", pkgName, version)
+	fmt.Printf("ℹ️  New shell required for changes to take effect\n")
 	return nil
 }
 
