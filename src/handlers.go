@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -21,10 +22,17 @@ func handleAdd(manifestURL string) error {
 	fmt.Printf("✓ Manifest loaded: %s@%s\n", manifest.Name, manifest.Version)
 
 	// Get the target for current OS/Arch
-	target := getTargetForOS(manifest)
+	selectedTargetKey, target := getTargetForOS(manifest)
 	if target == nil {
-		return fmt.Errorf("no compatible target found for %s/%s", runtime.GOOS, runtime.GOARCH)
+		return fmt.Errorf(
+			"no compatible target found for runtime %s/%s. available targets: %s",
+			runtime.GOOS,
+			runtime.GOARCH,
+			strings.Join(sortedTargetKeys(manifest.Targets), ", "),
+		)
 	}
+
+	fmt.Printf("✓ Selected target: %s for runtime %s/%s\n", selectedTargetKey, runtime.GOOS, runtime.GOARCH)
 
 	// Setup storage
 	sm, err := NewStorageManager()
@@ -145,22 +153,52 @@ func handleAdd(manifestURL string) error {
 	return nil
 }
 
-// getTargetForOS returns the target matching current OS and architecture
-func getTargetForOS(manifest *Manifest) *Target {
-	osArch := fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+// getTargetForOS returns the target matching current OS and architecture.
+func getTargetForOS(manifest *Manifest) (string, *Target) {
+	osName := runtime.GOOS
+	archNames := platformArchAliases(runtime.GOARCH)
 
-	if target, exists := manifest.Targets[osArch]; exists {
-		return &target
-	}
-
-	// Fallback: try just the OS
-	for key, target := range manifest.Targets {
-		if strings.HasPrefix(key, runtime.GOOS) {
-			return &target
+	for _, archName := range archNames {
+		key := fmt.Sprintf("%s-%s", osName, archName)
+		if target, exists := manifest.Targets[key]; exists {
+			return key, &target
 		}
 	}
 
-	return nil
+	for _, key := range sortedTargetKeys(manifest.Targets) {
+		if !strings.HasPrefix(strings.ToLower(key), strings.ToLower(osName)+"-") {
+			continue
+		}
+
+		target := manifest.Targets[key]
+		return key, &target
+	}
+
+	return "", nil
+}
+
+func platformArchAliases(goArch string) []string {
+	switch strings.ToLower(goArch) {
+	case "amd64":
+		return []string{"amd64", "x64", "x86_64"}
+	case "386":
+		return []string{"386", "x86", "i386"}
+	case "arm64":
+		return []string{"arm64", "aarch64"}
+	case "arm":
+		return []string{"arm"}
+	default:
+		return []string{strings.ToLower(goArch)}
+	}
+}
+
+func sortedTargetKeys(targets map[string]Target) []string {
+	keys := make([]string, 0, len(targets))
+	for key := range targets {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // handleRemove removes a package version
