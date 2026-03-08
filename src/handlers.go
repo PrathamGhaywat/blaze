@@ -465,13 +465,65 @@ func handleCleanup() error {
 		removedPathEntries++
 	}
 
-	if removedRegistryEntries == 0 && removedPathEntries == 0 {
+	// Clean up empty directories
+	removedEmptyDirs, err := cleanupEmptyDirs(sm.PackagesDir)
+	if err != nil {
+		return fmt.Errorf("failed to clean up empty directories: %w", err)
+	}
+
+	if removedRegistryEntries == 0 && removedPathEntries == 0 && removedEmptyDirs == 0 {
 		fmt.Println("🧹 Nothing to clean up")
 		return nil
 	}
 
-	fmt.Printf("✅ Cleanup complete: removed %d stale registry entries and %d dead PATH entries\n", removedRegistryEntries, removedPathEntries)
+	fmt.Printf("✅ Cleanup complete: removed %d stale registry entries, %d dead PATH entries, and %d empty directories\n", removedRegistryEntries, removedPathEntries, removedEmptyDirs)
 	return nil
+}
+
+func cleanupEmptyDirs(targetPath string) (int, error) {
+	removedCount := 0
+	var dirsToCheck []string
+
+	err := filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if info.IsDir() {
+			dirsToCheck = append(dirsToCheck, path)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to walk directory: %w", err)
+	}
+
+	// Sort directories by depth (deepest first) so we remove leaves before parents
+	sort.Slice(dirsToCheck, func(i, j int) bool {
+		count_i := strings.Count(dirsToCheck[i], string(os.PathSeparator))
+		count_j := strings.Count(dirsToCheck[j], string(os.PathSeparator))
+		return count_i > count_j
+	})
+
+	// Try to remove each directory (will only succeed if empty)
+	for _, dir := range dirsToCheck {
+		if dir == targetPath {
+			continue
+		}
+
+		err := os.Remove(dir)
+		if err == nil {
+			fmt.Printf("🧹 Removed empty directory: %s\n", dir)
+			removedCount++
+		}
+	}
+
+	return removedCount, nil
 }
 
 func isBlazeManagedPath(sm *StorageManager, candidate string) bool {
