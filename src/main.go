@@ -16,6 +16,7 @@ func main() {
 			cmdRemove,
 			cmdUse,
 			cmdList,
+			cmdCleanup,
 		},
 	}
 
@@ -74,5 +75,13 @@ var cmdList = &cli.Command{
 	Usage: "List all installed packages",
 	Action: func(c *cli.Context) error {
 		return handleList()
+	},
+}
+
+var cmdCleanup = &cli.Command{
+	Name:  "cleanup",
+	Usage: "Remove stale registry entries and dead Blaze PATH entries",
+	Action: func(c *cli.Context) error {
+		return handleCleanup()
 	},
 }

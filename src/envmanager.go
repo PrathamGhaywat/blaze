@@ -29,34 +29,34 @@ func (em *EnvManager) AddToPath(binDir string) error {
 	return em.addToPathUnix(binDir)
 }
 
+// ListPathEntries returns the persisted PATH entries used by Blaze.
+func (em *EnvManager) ListPathEntries() ([]string, error) {
+	if em.isWindows {
+		currentPath, err := em.getWindowsUserPath()
+		if err != nil {
+			return nil, err
+		}
+		return splitPathEntries(currentPath), nil
+	}
+
+	return splitPathEntries(os.Getenv("PATH")), nil
+}
+
 // addToPathWindows adds to PATH on Windows via Registry (no 1024 char limit)
 func (em *EnvManager) addToPathWindows(binDir string) error {
-	// Get current PATH
-	currentPath := os.Getenv("PATH")
-	if strings.Contains(currentPath, binDir) {
+	currentPath, err := em.getWindowsUserPath()
+	if err != nil {
+		return err
+	}
+
+	if containsPathEntry(splitPathEntries(currentPath), binDir) {
 		return nil // Already in PATH
 	}
 
-	// Use PowerShell to update Registry directly (avoids setx 1024 char limit)
-	psCmd := fmt.Sprintf(`
-		$regPath = 'HKCU:\Environment'
-		$pathValue = (Get-ItemProperty -Path $regPath -Name PATH -ErrorAction SilentlyContinue).PATH
-		if (-not $pathValue) { $pathValue = '' }
-		if ($pathValue -notlike '*%s*') {
-			if ($pathValue) {
-				$newPath = $pathValue + ';' + '%s'
-			} else {
-				$newPath = '%s'
-			}
-			Set-ItemProperty -Path $regPath -Name PATH -Value $newPath
-			Write-Host 'PATH updated successfully'
-		}
-	`, binDir, binDir, binDir)
-
-	cmd := exec.Command("powershell", "-NoProfile", "-Command", psCmd)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to update PATH: %w\noutput: %s", err, string(output))
+	entries := splitPathEntries(currentPath)
+	entries = append(entries, binDir)
+	if err := em.setWindowsUserPath(strings.Join(entries, string(os.PathListSeparator))); err != nil {
+		return err
 	}
 
 	fmt.Printf("✓ PATH updated via Registry\n")
@@ -127,20 +127,23 @@ func (em *EnvManager) RemoveFromPath(binDir string) error {
 
 // removeFromPathWindows removes from PATH on Windows
 func (em *EnvManager) removeFromPathWindows(binDir string) error {
-	currentPath := os.Getenv("PATH")
-	pathParts := strings.Split(currentPath, ";")
+	currentPath, err := em.getWindowsUserPath()
+	if err != nil {
+		return err
+	}
+
+	pathParts := splitPathEntries(currentPath)
 
 	var newPathParts []string
 	for _, part := range pathParts {
-		if part != binDir {
+		if !samePathEntry(part, binDir) {
 			newPathParts = append(newPathParts, part)
 		}
 	}
 
-	newPath := strings.Join(newPathParts, ";")
-	cmd := exec.Command("setx", "PATH", newPath)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to update PATH on Windows: %w", err)
+	newPath := strings.Join(newPathParts, string(os.PathListSeparator))
+	if err := em.setWindowsUserPath(newPath); err != nil {
+		return err
 	}
 
 	return nil
@@ -177,6 +180,70 @@ func (em *EnvManager) removeFromPathUnix(binDir string) error {
 		if err := os.WriteFile(profileFile, []byte(strings.Join(newLines, "\n")), 0644); err != nil {
 			continue
 		}
+	}
+
+	return nil
+}
+
+func splitPathEntries(pathValue string) []string {
+	if pathValue == "" {
+		return []string{}
+	}
+
+	parts := strings.Split(pathValue, string(os.PathListSeparator))
+	entries := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			entries = append(entries, trimmed)
+		}
+	}
+
+	return entries
+}
+
+func containsPathEntry(entries []string, candidate string) bool {
+	for _, entry := range entries {
+		if samePathEntry(entry, candidate) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func samePathEntry(left, right string) bool {
+	left = filepath.Clean(left)
+	right = filepath.Clean(right)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(left, right)
+	}
+	return left == right
+}
+
+func (em *EnvManager) getWindowsUserPath() (string, error) {
+	cmd := exec.Command(
+		"powershell",
+		"-NoProfile",
+		"-Command",
+		"$value = (Get-ItemProperty -Path 'HKCU:\\Environment' -Name PATH -ErrorAction SilentlyContinue).PATH; if ($null -eq $value) { '' } else { $value }",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to read Windows PATH from registry: %w\noutput: %s", err, string(output))
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+func (em *EnvManager) setWindowsUserPath(pathValue string) error {
+	escapedPathValue := strings.ReplaceAll(pathValue, "'", "''")
+	psCmd := fmt.Sprintf("Set-ItemProperty -Path 'HKCU:\\Environment' -Name PATH -Value '%s'", escapedPathValue)
+	cmd := exec.Command("powershell", "-NoProfile", "-Command", psCmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to update PATH: %w\noutput: %s", err, string(output))
 	}
 
 	return nil

@@ -314,3 +314,101 @@ func handleList() error {
 
 	return nil
 }
+
+func handleCleanup() error {
+	sm, err := NewStorageManager()
+	if err != nil {
+		return fmt.Errorf("failed to setup storage: %w", err)
+	}
+
+	em := NewEnvManager()
+	registry, err := sm.LoadRegistry()
+	if err != nil {
+		return fmt.Errorf("failed to load registry: %w", err)
+	}
+
+	removedRegistryEntries := 0
+	cleanedRegistry := make(map[string][]string, len(registry))
+	registryChanged := false
+
+	for pkgName, versions := range registry {
+		validVersions := make([]string, 0, len(versions))
+		for _, version := range versions {
+			contentPath := filepath.Join(sm.GetPackagePath(pkgName, version), "content")
+			info, statErr := os.Stat(contentPath)
+			if statErr == nil && info.IsDir() {
+				validVersions = append(validVersions, version)
+				continue
+			}
+
+			if statErr != nil && !os.IsNotExist(statErr) {
+				return fmt.Errorf("failed to inspect package %s@%s: %w", pkgName, version, statErr)
+			}
+
+			fmt.Printf("🧹 Removing stale registry entry: %s@%s\n", pkgName, version)
+			removedRegistryEntries++
+			registryChanged = true
+		}
+
+		if len(validVersions) > 0 {
+			cleanedRegistry[pkgName] = validVersions
+		} else if len(versions) > 0 {
+			registryChanged = true
+		}
+	}
+
+	if registryChanged {
+		if err := sm.SaveRegistry(cleanedRegistry); err != nil {
+			return fmt.Errorf("failed to save cleaned registry: %w", err)
+		}
+	}
+
+	pathEntries, err := em.ListPathEntries()
+	if err != nil {
+		return fmt.Errorf("failed to read PATH entries: %w", err)
+	}
+
+	removedPathEntries := 0
+	for _, entry := range pathEntries {
+		if !isBlazeManagedPath(sm, entry) {
+			continue
+		}
+
+		info, statErr := os.Stat(entry)
+		if statErr == nil && info.IsDir() {
+			continue
+		}
+
+		if statErr != nil && !os.IsNotExist(statErr) {
+			return fmt.Errorf("failed to inspect PATH entry %s: %w", entry, statErr)
+		}
+
+		fmt.Printf("🧹 Removing dead PATH entry: %s\n", entry)
+		if err := em.RemoveFromPath(entry); err != nil {
+			return fmt.Errorf("failed to remove dead PATH entry %s: %w", entry, err)
+		}
+		removedPathEntries++
+	}
+
+	if removedRegistryEntries == 0 && removedPathEntries == 0 {
+		fmt.Println("🧹 Nothing to clean up")
+		return nil
+	}
+
+	fmt.Printf("✅ Cleanup complete: removed %d stale registry entries and %d dead PATH entries\n", removedRegistryEntries, removedPathEntries)
+	return nil
+}
+
+func isBlazeManagedPath(sm *StorageManager, candidate string) bool {
+	cleanCandidate := filepath.Clean(candidate)
+	cleanPackagesDir := filepath.Clean(sm.PackagesDir)
+	packagesPrefix := cleanPackagesDir + string(os.PathSeparator)
+
+	if runtime.GOOS == "windows" {
+		candidateLower := strings.ToLower(cleanCandidate)
+		packagesLower := strings.ToLower(cleanPackagesDir)
+		return candidateLower == packagesLower || strings.HasPrefix(candidateLower, strings.ToLower(packagesPrefix))
+	}
+
+	return cleanCandidate == cleanPackagesDir || strings.HasPrefix(cleanCandidate, packagesPrefix)
+}
