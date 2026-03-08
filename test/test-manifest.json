@@ -25,7 +25,7 @@
     "linux-amd64": {
       "archive_type": "tar.gz",
       "url": "https://github.com/cli/cli/releases/download/v2.87.3/gh_2.87.3_linux_amd64.tar.gz",
-      "sha256": "sha256:c6e5537631fca45f277ef405ce8751d139b491e9402cc20891a003525a8773b2",
+      "sha256": "c6e5537631fca45f277ef405ce8751d139b491e9402cc20891a003525a8773b2",
       "bin": [
         "bin/gh"
       ]
