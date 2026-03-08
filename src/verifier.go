@@ -17,6 +17,8 @@ func VerifyAndDownload(url, expectedSHA256, destPath string) error {
 		return fmt.Errorf("only http and https URLs are supported, got: %s", url)
 	}
 
+	expectedSHA256 = normalizeSHA256(expectedSHA256)
+
 	tempPath := destPath + ".tmp"
 	downloadCommitted := false
 	if err := os.Remove(tempPath); err != nil && !os.IsNotExist(err) {
@@ -56,7 +58,7 @@ func VerifyAndDownload(url, expectedSHA256, destPath string) error {
 
 	// Verify hash
 	actualSHA256 := fmt.Sprintf("%x", hash.Sum(nil))
-	if actualSHA256 != strings.ToLower(expectedSHA256) {
+	if actualSHA256 != expectedSHA256 {
 		return fmt.Errorf("SHA256 mismatch: expected %s, got %s", expectedSHA256, actualSHA256)
 	}
 
@@ -84,4 +86,9 @@ func createFile(path string) (*os.File, error) {
 		return nil, err
 	}
 	return os.Create(path)
+}
+
+func normalizeSHA256(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	return strings.TrimPrefix(value, "sha256:")
 }

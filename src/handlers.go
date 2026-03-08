@@ -86,11 +86,16 @@ func handleAdd(manifestURL string) error {
 
 	fmt.Printf("✓ Archive extracted\n")
 
+	contentRoot, err := resolveContentRoot(extractPath, target)
+	if err != nil {
+		return err
+	}
+
 	// Add binaries to PATH
 	em := NewEnvManager()
 	seenBinDirs := make(map[string]struct{})
 	for _, bin := range target.Bin {
-		binPath := filepath.Join(extractPath, bin)
+		binPath := filepath.Join(contentRoot, bin)
 		binDir := filepath.Dir(binPath)
 
 		fmt.Printf("🔗 Adding to PATH: %s\n", binDir)
@@ -175,6 +180,38 @@ func getTargetForOS(manifest *Manifest) (string, *Target) {
 	}
 
 	return "", nil
+}
+
+func resolveContentRoot(extractPath string, target *Target) (string, error) {
+	if target.ExtractRoot != "" {
+		contentRoot := filepath.Join(extractPath, target.ExtractRoot)
+		info, err := os.Stat(contentRoot)
+		if err != nil {
+			return "", fmt.Errorf("extract_root not found: %s", contentRoot)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("extract_root is not a directory: %s", contentRoot)
+		}
+		return contentRoot, nil
+	}
+
+	entries, err := os.ReadDir(extractPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect extracted archive: %w", err)
+	}
+
+	directories := make([]os.DirEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			directories = append(directories, entry)
+		}
+	}
+
+	if len(entries) == 1 && len(directories) == 1 {
+		return filepath.Join(extractPath, directories[0].Name()), nil
+	}
+
+	return extractPath, nil
 }
 
 func platformArchAliases(goArch string) []string {
