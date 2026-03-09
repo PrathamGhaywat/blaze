@@ -1,6 +1,6 @@
 # Blaze
 
-A cross-platform(untested on macOS) package manager for installing and managing command-line tools. See [the documentation](https://blaze.ultimatedev.space)
+A cross-platform(untested on macOS) package manager for installing and managing command-line tools.
 
 ## Overview
 
@@ -24,13 +24,13 @@ Place it somewhere in your PATH or run it directly.
 ## Quick Start
 
 ### Add a package
-
+To test it out you can run the following command to install the GitHub CLI tool: 
 ```bash
-blaze add https://example.com/package-manifest.json
+blaze add https://raw.githubusercontent.com/PrathamGhaywat/blaze/refs/heads/main/test/test-manifest.json
 ```
 
 Blaze will:
-1. Download the manifest
+1. Download the manifest (in our case the github cli manifest from the test directory)
 2. Select the appropriate platform target
 3. Download and verify the package (SHA256)
 4. Extract the archive
@@ -176,7 +176,7 @@ If any step fails, the entire installation is rolled back.
 
 **macOS**: Similar to Linux, but untested on the OS at all. 
 
-Changes take effect in new shell sessions only.
+Changes take effect in new shell sessions only. (may vary based on platform and shell)
 
 ### Version Switching
 
