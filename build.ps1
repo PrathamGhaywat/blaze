@@ -30,32 +30,32 @@ $targets = @(
     @{
         OS     = "windows"
         Arch   = "amd64"
-        Output = "blaze.exe"
+        Output = "blaze-windows-amd64.exe"
     }
     @{
         OS     = "linux"
         Arch   = "amd64"
-        Output = "blaze"
+        Output = "blaze-linux-amd64"
     }
     @{
         OS     = "linux"
         Arch   = "arm64"
-        Output = "blaze"
+        Output = "blaze-linux-arm64"
     }
     @{
         OS     = "windows"
         Arch   = "arm64"
-        Output = "blaze.exe"
+        Output = "blaze-windows-arm64.exe"
     }
     @{
         OS     = "darwin"
         Arch   = "amd64"
-        Output = "blaze"
+        Output = "blaze-darwin-amd64"
     }
     @{
         OS     = "darwin"
         Arch   = "arm64"
-        Output = "blaze"
+        Output = "blaze-darwin-arm64"
     }
 )
 
