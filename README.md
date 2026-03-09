@@ -1,6 +1,6 @@
 # Blaze
 
-A cross-platform(untested on macOS) package manager for installing and managing command-line tools.
+A cross-platform (untested on macOS) package manager for installing and managing command-line tools.
 
 ## Overview
 
@@ -15,9 +15,7 @@ Key features:
 
 ## Installation
 
-Download the appropriate binary for your system:
-- Windows: `blaze.exe`
-- Linux: `blaze`
+Download the appropriate binary for your system from the [releases page](https://github.com/PrathamGhaywat/blaze/releases).
 
 Place it somewhere in your PATH or run it directly.
 
@@ -120,6 +118,7 @@ Manifests define packages and their platform-specific implementations.
   }
 }
 ```
+See the [test manifest](https://raw.githubusercontent.com/PrathamGhaywat/blaze/refs/heads/main/test/test-manifest.json) for an example.
 
 ### Required fields
 
@@ -185,10 +184,13 @@ The `use` command removes all PATH entries for the package and adds entries for 
 ## Supported Platforms
 
 - Windows (amd64)
-- macOS (amd64, arm64)
 - Linux (amd64, arm64, etc.)
 
 Architecture aliases are supported (e.g., x64 = amd64, x86_64 = amd64).
+
+## Untested Platforms
+
+- macOS (amd64, arm64)
 
 ## Error Handling
 
@@ -226,3 +228,5 @@ Blaze is implemented in Go for:
 ## License
 
 MIT
+
+This project was created for educational purposes and is not intended for production use. Use at your own risk.
