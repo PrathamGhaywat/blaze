@@ -17,7 +17,7 @@ Key features:
 
 Download the appropriate binary for your system from the [releases page](https://github.com/PrathamGhaywat/blaze/releases).
 
-Place it somewhere in your PATH or run it directly.
+Place it somewhere in your PATH or run it directly (from the terminal!)
 
 ## Quick Start
 
